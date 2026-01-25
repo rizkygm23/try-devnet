@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
-source ../../../config.sh
-source ../common/wallet.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../../../config.sh"
+source "$SCRIPT_DIR/../common/wallet.sh"
 
 dev_wallet
 

@@ -9,9 +9,10 @@ app.use(cors());
 app.use(express.json());
 
 const SESSIONS_DIR = __dirname + "/sessions";
+if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 
 /**
- * STEP 1: start simulation
+ * STEP 1 – Generate wallet
  */
 app.post("/api/start", (req, res) => {
     exec(
@@ -28,16 +29,13 @@ app.post("/api/start", (req, res) => {
                 JSON.stringify(wallet, null, 2)
             );
 
-            res.json({
-                sessionId,
-                ...wallet
-            });
+            res.json({ sessionId, ...wallet });
         }
     );
 });
 
 /**
- * STEP 2: deploy after faucet
+ * STEP 2 – Deploy contract
  */
 app.post("/api/deploy", (req, res) => {
     const { sessionId } = req.body;

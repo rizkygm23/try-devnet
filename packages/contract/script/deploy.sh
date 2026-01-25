@@ -1,10 +1,17 @@
 #!/bin/bash
 set -e
 
-source ../../../config.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../../../config.sh"
 
 PRIVKEY=$1
 CONTRACT_PATH="src/Counter.sol:Counter"
+
+if [ -z "$PRIVKEY" ]; then
+  echo "Missing private key" >&2
+  exit 1
+fi
 
 deploy_output=$(sforge create \
   --rpc-url "$RPC_URL" \
