@@ -14,7 +14,7 @@ if [ -z "$PRIVKEY" ]; then
   exit 1
 fi
 
-deploy_output=$(sforge create \
+deploy_output=$(cd "$SCRIPT_DIR/.." && sforge create \
   --rpc-url "$RPC_URL" \
   --private-key "$PRIVKEY" \
   --broadcast \
