@@ -14,22 +14,50 @@ if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
 /**
  * STEP 1 – Generate wallet
  */
+const sendError = (res, statusCode, message, code = "ERROR") => {
+    res.status(statusCode).json({
+        success: false,
+        error: {
+            code,
+            message
+        }
+    });
+};
+
+const sendSuccess = (res, data) => {
+    res.json({
+        success: true,
+        data
+    });
+};
+
+/**
+ * STEP 1 – Generate wallet
+ */
 app.post("/api/start", (req, res) => {
     exec(
         "bash ../packages/contract/script/generate_wallet.sh",
         { cwd: __dirname },
-        (err, stdout) => {
-            if (err) return res.status(500).json({ error: err.message });
+        (err, stdout, stderr) => {
+            if (err) {
+                console.error("Generate Wallet Error:", stderr || err.message);
+                return sendError(res, 500, "Failed to generate wallet", "WALLET_GEN_FAILED");
+            }
 
-            const wallet = JSON.parse(stdout);
-            const sessionId = crypto.randomUUID();
+            try {
+                const wallet = JSON.parse(stdout);
+                const sessionId = crypto.randomUUID();
 
-            fs.writeFileSync(
-                `${SESSIONS_DIR}/${sessionId}.json`,
-                JSON.stringify(wallet, null, 2)
-            );
+                fs.writeFileSync(
+                    `${SESSIONS_DIR}/${sessionId}.json`,
+                    JSON.stringify(wallet, null, 2)
+                );
 
-            res.json({ sessionId, ...wallet });
+                sendSuccess(res, { sessionId, ...wallet });
+            } catch (parseError) {
+                console.error("JSON Parse Error:", stdout);
+                sendError(res, 500, "Invalid output from wallet script", "PARSE_ERROR");
+            }
         }
     );
 });
@@ -39,26 +67,44 @@ app.post("/api/start", (req, res) => {
  */
 app.post("/api/deploy", (req, res) => {
     const { sessionId } = req.body;
+
+    if (!sessionId) {
+        return sendError(res, 400, "Session ID is required", "MISSING_SESSION_ID");
+    }
+
     const path = `${SESSIONS_DIR}/${sessionId}.json`;
 
     if (!fs.existsSync(path)) {
-        return res.status(404).json({ error: "Session not found" });
+        return sendError(res, 404, "Session not found", "SESSION_NOT_FOUND");
     }
 
-    const session = JSON.parse(fs.readFileSync(path));
+    let session;
+    try {
+        session = JSON.parse(fs.readFileSync(path));
+    } catch (e) {
+        return sendError(res, 500, "Corrupted session file", "SESSION_READ_ERROR");
+    }
 
     exec(
         `bash ../packages/contract/script/deploy.sh ${session.privateKey}`,
         { cwd: __dirname },
-        (err, stdout) => {
-            if (err) return res.status(500).json({ error: err.message });
+        (err, stdout, stderr) => {
+            if (err) {
+                console.error("Deploy Error:", stderr || err.message);
+                // Try to extract a clean error message if possible
+                return sendError(res, 500, "Deployment failed. Check server logs.", "DEPLOY_FAILED");
+            }
 
-            const deploy = JSON.parse(stdout);
-
-            res.json({
-                walletAddress: session.walletAddress,
-                ...deploy
-            });
+            try {
+                const deploy = JSON.parse(stdout);
+                sendSuccess(res, {
+                    walletAddress: session.walletAddress,
+                    ...deploy
+                });
+            } catch (parseError) {
+                console.error("JSON Parse Error:", stdout);
+                sendError(res, 500, "Invalid output from deploy script", "PARSE_ERROR");
+            }
         }
     );
 });
