@@ -108,11 +108,18 @@ export default function Home() {
     setError(null);
     try {
       const res = await axios.post(`${API_BASE_URL}/api/start`);
-      if (res.data.success) {
-        setSession(res.data.data);
+
+      // Support both new standard format and legacy flat format
+      const data = res.data;
+      if (data.success && data.data) {
+        setSession(data.data);
+        setStep("SESSION");
+      } else if (data.sessionId) {
+        // Handle legacy/flat response from VPS if server code isn't updated yet
+        setSession(data as SessionData);
         setStep("SESSION");
       } else {
-        setError(res.data.error?.message || "Failed to start session");
+        setError(data.error?.message || "Failed to start session");
       }
     } catch (err: any) {
       setError(err.response?.data?.error?.message || err.message || "Network error");
@@ -133,19 +140,25 @@ export default function Home() {
     if (!session) return;
     setLoading(true);
     setError(null);
-    setStep("DEPLOYING"); // This is the actual loading state for deployment
+    setStep("DEPLOYING");
 
     try {
       const res = await axios.post(`${API_BASE_URL}/api/deploy`, {
         sessionId: session.sessionId
       });
 
-      if (res.data.success) {
-        setDeployResult(res.data.data);
+      // Support both new standard format and legacy flat format
+      const data = res.data;
+      if (data.success && data.data) {
+        setDeployResult(data.data);
+        setStep("SUCCESS");
+      } else if (data.contractAddress || data.walletAddress) {
+        // Handle legacy/flat response
+        setDeployResult(data as DeployData);
         setStep("SUCCESS");
       } else {
-        setError(res.data.error?.message || "Deployment failed");
-        setStep("SESSION"); // Go back to session state to retry
+        setError(data.error?.message || "Deployment failed");
+        setStep("SESSION");
       }
     } catch (err: any) {
       setError(err.response?.data?.error?.message || err.message || "Deployment failed");
