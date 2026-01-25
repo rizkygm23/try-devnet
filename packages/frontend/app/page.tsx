@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import axios from "axios";
+import Image from "next/image";
 import {
   Rocket,
   Wallet,
@@ -15,10 +16,7 @@ import {
 } from "lucide-react";
 
 // API Configuration
-// In a real app, use process.env.NEXT_PUBLIC_API_URL
-// For this demo, we use the specific VPS IP or localhost if configured.
-// Ideally, the Next.js app should proxy these requests or point to the right place.
-const API_BASE_URL = "http://75.119.155.222:3000"; // Based on docs
+const API_BASE_URL = "http://75.119.155.222:3000";
 
 /* --- Types --- */
 type SessionData = {
@@ -52,9 +50,9 @@ const Button = ({
   const baseStyle = "px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed";
 
   const variants = {
-    primary: "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20",
-    secondary: "bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700",
-    outline: "border border-zinc-700 text-zinc-300 hover:bg-zinc-800/50"
+    primary: "bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] shadow-lg shadow-[var(--primary)]/20",
+    secondary: "bg-[var(--secondary)] hover:opacity-90 text-[var(--secondary-foreground)] border border-[var(--border)]",
+    outline: "border border-[var(--border)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]/50"
   };
 
   return (
@@ -69,7 +67,7 @@ const Button = ({
 };
 
 const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/50 rounded-2xl p-6 shadow-2xl ${className}`}>
+  <div className={`bg-[var(--card)] backdrop-blur-xl border border-[var(--border)] rounded-2xl p-6 shadow-2xl ${className}`}>
     {children}
   </div>
 );
@@ -86,7 +84,7 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+      className="p-2 hover:bg-[var(--primary)]/20 rounded-lg transition-colors text-[var(--muted-foreground)] hover:text-white"
       title="Copy to clipboard"
     >
       {copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
@@ -109,13 +107,11 @@ export default function Home() {
     try {
       const res = await axios.post(`${API_BASE_URL}/api/start`);
 
-      // Support both new standard format and legacy flat format
       const data = res.data;
       if (data.success && data.data) {
         setSession(data.data);
         setStep("SESSION");
       } else if (data.sessionId) {
-        // Handle legacy/flat response from VPS if server code isn't updated yet
         setSession(data as SessionData);
         setStep("SESSION");
       } else {
@@ -126,14 +122,6 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFunded = () => {
-    setStep("FUNDING");
-    // Small artificial delay to improve UX
-    setTimeout(() => setStep("DEPLOYING"), 500);
-    // Actually, "DEPLOYING" is a state where we show the deploy button. 
-    // Let's rename step for clarity: "READY_TO_DEPLOY"
   };
 
   const handleDeploy = async () => {
@@ -147,13 +135,11 @@ export default function Home() {
         sessionId: session.sessionId
       });
 
-      // Support both new standard format and legacy flat format
       const data = res.data;
       if (data.success && data.data) {
         setDeployResult(data.data);
         setStep("SUCCESS");
       } else if (data.contractAddress || data.walletAddress) {
-        // Handle legacy/flat response
         setDeployResult(data as DeployData);
         setStep("SUCCESS");
       } else {
@@ -161,7 +147,13 @@ export default function Home() {
         setStep("SESSION");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || err.message || "Deployment failed");
+      const errorMessage = err.response?.data?.error?.message || err.response?.data?.error || err.message || "Deployment failed";
+
+      if (errorMessage.includes("insufficient funds")) {
+        setError("Insufficient funds! Please make sure you have claimed ETH from the faucet.");
+      } else {
+        setError(errorMessage);
+      }
       setStep("SESSION");
     } finally {
       setLoading(false);
@@ -179,23 +171,35 @@ export default function Home() {
     <main className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-indigo-600/10 rounded-full blur-[100px]" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px]" />
+        <div className="absolute top-20 left-10 w-96 h-96 bg-[var(--primary)]/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-[var(--color-brand-deep)]/30 rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-3xl z-10 space-y-8">
 
         {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm font-medium">
+        <div className="text-center space-y-6">
+          <div className="flex justify-center">
+            <div className="relative w-24 h-24 md:w-32 md:h-32 drop-shadow-2xl">
+              <Image
+                src="/logo.png"
+                alt="Seismic Logo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--primary)]/10 border border-[var(--primary)]/20 text-[var(--accent)] text-sm font-medium">
             <Rocket size={14} />
             <span>Seismic Devnet Playground</span>
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-zinc-200 to-zinc-500 tracking-tight">
+          <h1 className="text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] via-[var(--color-brand-beige)] to-[var(--color-brand-mauve)] tracking-tight">
             Build on Seismic
           </h1>
-          <p className="text-zinc-400 text-lg max-w-xl mx-auto">
-            Experience the future of decentralized computing. Generate a wallet, fund it, and deploy a contract in seconds.
+          <p className="text-[var(--muted-foreground)] text-lg max-w-xl mx-auto">
+            Experience the future of on-chain privacy. Build shielded applications with protocol-level encryption using Seismic's modified EVM and secure hardware integration.
           </p>
         </div>
 
@@ -217,7 +221,7 @@ export default function Home() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-semibold mb-2">Ready to Start?</h3>
-                  <p className="text-zinc-400">Creates a temporary wallet session for you.</p>
+                  <p className="text-[var(--muted-foreground)]">Creates a temporary wallet session for you.</p>
                 </div>
                 <Button onClick={handleStartSession} disabled={loading} className="w-full md:w-auto mx-auto min-w-[200px]">
                   {loading ? <Loader2 className="animate-spin" /> : "Start Simulation"}
@@ -231,7 +235,7 @@ export default function Home() {
               {/* Wallet Info */}
               <Card>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                  <div className="p-2 bg-[var(--primary)]/20 rounded-lg text-[var(--primary)]">
                     <Wallet size={20} />
                   </div>
                   <h2 className="text-xl font-semibold">Step 1: Fund Your Wallet</h2>
@@ -239,19 +243,28 @@ export default function Home() {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm text-zinc-500 uppercase tracking-wider font-semibold">Wallet Address</label>
-                    <div className="flex items-center gap-2 bg-zinc-950/50 border border-zinc-800 rounded-lg p-3">
-                      <code className="flex-1 text-zinc-300 font-mono text-sm break-all">{session.walletAddress}</code>
+                    <label className="text-sm text-[var(--muted-foreground)] uppercase tracking-wider font-semibold">Wallet Address</label>
+                    <div className="flex items-center gap-2 bg-[var(--background)]/50 border border-[var(--border)] rounded-lg p-3">
+                      <code className="flex-1 text-[var(--foreground)] font-mono text-sm break-all">{session.walletAddress}</code>
                       <CopyButton text={session.walletAddress} />
+                      <a
+                        href={`https://explorer-2.seismicdev.net/address/${session.walletAddress}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 hover:bg-[var(--primary)]/20 rounded-lg transition-colors text-[var(--muted-foreground)] hover:text-white"
+                        title="View on Explorer"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
                     </div>
                   </div>
 
-                  <div className="bg-amber-900/20 border border-amber-900/50 p-4 rounded-lg text-amber-200/80 text-sm">
+                  <div className="bg-[var(--secondary)]/50 border border-[var(--secondary)] p-4 rounded-lg text-white text-sm">
                     ⚠️ <strong>Development Only:</strong> Private Key: <span className="font-mono blur-[2px] hover:blur-none transition-all cursor-pointer select-all">{session.privateKey}</span>
                   </div>
 
-                  <div className="pt-4 border-t border-zinc-800">
-                    <p className="text-zinc-400 mb-4">You need to fund this wallet to deploy contracts.</p>
+                  <div className="pt-4 border-t border-[var(--border)]">
+                    <p className="text-[var(--muted-foreground)] mb-4">You need to fund this wallet to deploy contracts.</p>
                     <div className="flex flex-col sm:flex-row gap-4">
                       <a
                         href={session.faucet}
@@ -283,22 +296,22 @@ export default function Home() {
 
           {step === "SUCCESS" && deployResult && (
             <div className="animate-in zoom-in-95 duration-500">
-              <Card className="border-green-500/20 bg-green-900/5">
+              <Card className="border-[var(--primary)]/50 bg-[var(--primary)]/10">
                 <div className="text-center space-y-6">
-                  <div className="w-20 h-20 bg-green-500/20 rounded-full mx-auto flex items-center justify-center mb-4">
+                  <div className="w-20 h-20 bg-[var(--primary)]/20 rounded-full mx-auto flex items-center justify-center mb-4">
                     <CheckCircle2 size={40} className="text-green-500" />
                   </div>
 
                   <div>
                     <h2 className="text-3xl font-bold text-white mb-2">Deployment Successful!</h2>
-                    <p className="text-zinc-400">Your smart contract is live on the Devnet.</p>
+                    <p className="text-[var(--muted-foreground)]">Your smart contract is live on the Devnet.</p>
                   </div>
 
-                  <div className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-4 text-left space-y-4">
+                  <div className="bg-[var(--background)]/50 border border-[var(--border)] rounded-xl p-4 text-left space-y-4">
                     <div>
-                      <label className="text-xs text-zinc-500 uppercase font-semibold">Contract Address</label>
+                      <label className="text-xs text-[var(--muted-foreground)] uppercase font-semibold">Contract Address</label>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="font-mono text-green-400 text-lg">{deployResult.contractAddress}</span>
+                        <span className="font-mono text-[var(--accent)] text-lg">{deployResult.contractAddress}</span>
                         <CopyButton text={deployResult.contractAddress} />
                       </div>
                     </div>
@@ -319,7 +332,6 @@ export default function Home() {
             </div>
           )}
         </div>
-
       </div>
     </main>
   );
