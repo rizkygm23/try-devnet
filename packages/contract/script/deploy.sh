@@ -2,8 +2,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-source "$SCRIPT_DIR/../../../config.sh"
+source "$ROOT_DIR/config.sh"
 
 PRIVKEY=$1
 CONTRACT_PATH="src/Counter.sol:Counter"
