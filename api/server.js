@@ -32,9 +32,23 @@ const sendSuccess = (res, data) => {
 };
 
 /**
- * STEP 1 – Generate wallet
+ * @api {post} /api/start 1. Start Session / Generate Wallet
+ * @apiDescription Generates a new temporary developer wallet and creates a session.
+ * @apiGroup Workflow
+ * 
+ * @apiSuccess {Boolean} success True if successful
+ * @apiSuccess {Object} data Wallet and session details
+ * @apiSuccess {String} data.sessionId Unique session identifier
+ * @apiSuccess {String} data.walletAddress Generated wallet address
+ * @apiSuccess {String} data.privateKey Generated private key (for dev use only)
+ * @apiSuccess {String} data.faucet Faucet URL for funding
+ * 
+ * @apiError (500) {Object} error
+ * @apiError {String} error.code Error code (e.g., WALLET_GEN_FAILED)
+ * @apiError {String} error.message Error description
  */
 app.post("/api/start", (req, res) => {
+    // ... existing implementation ...
     exec(
         "bash ../packages/contract/script/generate_wallet.sh",
         { cwd: __dirname },
@@ -63,7 +77,21 @@ app.post("/api/start", (req, res) => {
 });
 
 /**
- * STEP 2 – Deploy contract
+ * @api {post} /api/deploy 2. Deploy Contract
+ * @apiDescription Deploys the contract using the wallet generated in the start session step.
+ * @apiGroup Workflow
+ * 
+ * @apiParam {String} sessionId The session ID returned from /api/start
+ * 
+ * @apiSuccess {Boolean} success True if successful
+ * @apiSuccess {Object} data Deployment details
+ * @apiSuccess {String} data.walletAddress The wallet address used for deployment
+ * @apiSuccess {String} data.contractAddress The deployed contract address
+ * @apiSuccess {String} data.contractLink Explorer link to the contract
+ * 
+ * @apiError (400) MISSING_SESSION_ID Session ID not provided
+ * @apiError (404) SESSION_NOT_FOUND Session file does not exist
+ * @apiError (500) DEPLOY_FAILED Contract deployment failed
  */
 app.post("/api/deploy", (req, res) => {
     const { sessionId } = req.body;
