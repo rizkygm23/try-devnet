@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 // API Configuration
-const API_BASE_URL = "http://75.119.155.222:3000";
+const API_BASE_URL = "https://api.seismicdata.my.id";
 
 /* --- Types --- */
 type SessionData = {
