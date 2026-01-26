@@ -147,9 +147,11 @@ export default function Home() {
         setStep("SESSION");
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.error?.message || err.response?.data?.error || err.message || "Deployment failed";
+      const errorData = err.response?.data?.error;
+      const errorMessage = errorData?.message || errorData || err.message || "Deployment failed";
+      const errorCode = errorData?.code;
 
-      if (errorMessage.includes("insufficient funds")) {
+      if (errorMessage.toLowerCase().includes("insufficient funds") || errorCode === "DEPLOY_FAILED") {
         setError("Insufficient funds! Please make sure you have claimed ETH from the faucet.");
       } else {
         setError(errorMessage);
