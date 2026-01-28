@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.seismicdata.my.id";
 
 /* --- Types --- */
 type SessionData = {
@@ -133,17 +133,22 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/session/${inputSessionId.trim()}`);
+      // User requested to fetch /api/deploy to resume
+      const res = await axios.post(`${API_BASE_URL}/api/deploy`, {
+        sessionId: inputSessionId.trim()
+      });
 
       const data = res.data;
       if (data.success && data.data) {
-        setSession(data.data);
-        setStep("SESSION");
+        setDeployResult(data.data);
+        setStep("SUCCESS");
       } else {
-        setError(data.error?.message || "Failed to resume session");
+        setError(data.error?.message || "Failed to check session");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || "Invalid Session ID or Network Error");
+      const errorData = err.response?.data?.error;
+      const errorMessage = errorData?.message || errorData || err.message || "Invalid Session ID or Network Error";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
