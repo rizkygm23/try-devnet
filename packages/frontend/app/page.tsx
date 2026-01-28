@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 // API Configuration
-const API_BASE_URL = "https://api.seismicdata.my.id";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 /* --- Types --- */
 type SessionData = {
@@ -100,6 +100,7 @@ export default function Home() {
   const [deployResult, setDeployResult] = useState<DeployData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inputSessionId, setInputSessionId] = useState("");
 
   const handleStartSession = async () => {
     setLoading(true);
@@ -119,6 +120,30 @@ export default function Home() {
       }
     } catch (err: any) {
       setError(err.response?.data?.error?.message || err.message || "Network error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResumeSession = async () => {
+    if (!inputSessionId.trim()) {
+      setError("Please enter a Session ID");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/session/${inputSessionId.trim()}`);
+
+      const data = res.data;
+      if (data.success && data.data) {
+        setSession(data.data);
+        setStep("SESSION");
+      } else {
+        setError(data.error?.message || "Failed to resume session");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || "Invalid Session ID or Network Error");
     } finally {
       setLoading(false);
     }
@@ -228,6 +253,33 @@ export default function Home() {
                 <Button onClick={handleStartSession} disabled={loading} className="w-full md:w-auto mx-auto min-w-[200px]">
                   {loading ? <Loader2 className="animate-spin" /> : "Start Simulation"}
                 </Button>
+
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-[var(--border)]" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-[var(--card)] px-2 text-[var(--muted-foreground)]">Or Resume Session</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter Session ID..."
+                    value={inputSessionId}
+                    onChange={(e) => setInputSessionId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--background)]/50 border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 transition-all text-center font-mono text-sm"
+                  />
+                  <Button
+                    onClick={handleResumeSession}
+                    disabled={loading || !inputSessionId.trim()}
+                    variant="outline"
+                    className="w-full md:w-auto mx-auto min-w-[200px]"
+                  >
+                    Resume Session
+                  </Button>
+                </div>
               </div>
             </Card>
           )}
@@ -240,7 +292,16 @@ export default function Home() {
                   <div className="p-2 bg-[var(--primary)]/20 rounded-lg text-[var(--primary)]">
                     <Wallet size={20} />
                   </div>
-                  <h2 className="text-xl font-semibold">Step 1: Fund Your Wallet</h2>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-semibold">Step 1: Fund Your Wallet</h2>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider font-semibold block mb-1">Session ID</span>
+                    <div className="flex items-center gap-1 bg-[var(--background)]/50 border border-[var(--border)] rounded px-2 py-1">
+                      <code className="text-xs font-mono">{session.sessionId.slice(0, 8)}...</code>
+                      <CopyButton text={session.sessionId} />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-4">

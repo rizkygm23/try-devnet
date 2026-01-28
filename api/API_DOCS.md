@@ -146,6 +146,39 @@ Deploys the smart contract using the wallet generated in the start session step.
 
 ---
 
+### 3️⃣ Get Session
+
+Retrieves an existing session using its Session ID.
+
+- **URL:** `/api/session/:sessionId`
+- **Method:** `GET`
+
+**✅ Success Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+    "walletAddress": "0x9EAb89989d22D44cBcd0b490a531d197C36b4AEb",
+    "privateKey": "0xe938f227...",
+    "faucet": "https://faucet-2.seismicdev.net/"
+  }
+}
+```
+
+**❌ Error Response:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SESSION_NOT_FOUND",
+    "message": "Session not found"
+  }
+}
+```
+
+---
+
 ## 🌐 Web / Frontend Flow
 
 This section describes how a frontend website should interact with the API.

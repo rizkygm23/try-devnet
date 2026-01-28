@@ -137,7 +137,29 @@ app.post("/api/deploy", (req, res) => {
     );
 });
 
-app.listen(3000, "0.0.0.0", () => {
-    console.log("API running on http://0.0.0.0:3000");
+app.get("/api/session/:sessionId", (req, res) => {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+        return sendError(res, 400, "Session ID is required", "MISSING_SESSION_ID");
+    }
+
+    const path = `${SESSIONS_DIR}/${sessionId}.json`;
+
+    if (!fs.existsSync(path)) {
+        return sendError(res, 404, "Session not found", "SESSION_NOT_FOUND");
+    }
+
+    try {
+        const session = JSON.parse(fs.readFileSync(path));
+        // Ensure consistent response format with /start
+        sendSuccess(res, { sessionId, ...session });
+    } catch (e) {
+        return sendError(res, 500, "Corrupted session file", "SESSION_READ_ERROR");
+    }
+});
+
+app.listen(3001, "0.0.0.0", () => {
+    console.log("API running on http://0.0.0.0:3001");
 });
 
