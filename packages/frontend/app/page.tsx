@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import axios from "axios";
 import Image from "next/image";
 import {
@@ -12,7 +12,9 @@ import {
   Terminal,
   Loader2,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Upload
 } from "lucide-react";
 
 // API Configuration
@@ -101,6 +103,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputSessionId, setInputSessionId] = useState("");
+  const [deployHistory, setDeployHistory] = useState<DeployData[]>([]);
+  const [isMultiDeploy, setIsMultiDeploy] = useState(false);
 
   const handleStartSession = async () => {
     setLoading(true);
@@ -122,6 +126,56 @@ export default function Home() {
       setError(err.response?.data?.error?.message || err.message || "Network error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadWallet = () => {
+    if (!session) return;
+    const element = document.createElement("a");
+    const file = new Blob([JSON.stringify(session, null, 2)], { type: "application/json" });
+    element.href = URL.createObjectURL(file);
+    element.download = `seismic-wallet-${session.sessionId.slice(0, 8)}.json`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportWallet = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const walletData = JSON.parse(content);
+
+        // Validate required fields
+        if (!walletData.sessionId || !walletData.walletAddress || !walletData.privateKey) {
+          setError("Invalid wallet file. Missing required fields.");
+          return;
+        }
+
+        // Set session data from imported file
+        setSession({
+          sessionId: walletData.sessionId,
+          walletAddress: walletData.walletAddress,
+          privateKey: walletData.privateKey,
+          faucet: walletData.faucet || `https://faucet-2.seismicdev.net/?address=${walletData.walletAddress}`
+        });
+        setStep("SESSION");
+        setError(null);
+      } catch (err) {
+        setError("Failed to parse wallet file. Please make sure it's a valid JSON.");
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -192,10 +246,60 @@ export default function Home() {
     }
   };
 
+  const handleDeployMultiple = async (count: number) => {
+    if (!session) return;
+    setLoading(true);
+    setError(null);
+    setStep("DEPLOYING");
+    setIsMultiDeploy(true);
+    setDeployHistory([]);
+
+    const results: DeployData[] = [];
+    let failureCount = 0;
+
+    for (let i = 0; i < count; i++) {
+      try {
+        const res = await axios.post(`${API_BASE_URL}/api/deploy`, {
+          sessionId: session.sessionId
+        });
+        const data = res.data;
+
+        if (data.success && data.data) {
+          results.push(data.data);
+          // Update history progressively
+          setDeployHistory(prev => [...prev, data.data]);
+        } else if (data.contractAddress) {
+          const result = data as DeployData;
+          results.push(result);
+          setDeployHistory(prev => [...prev, result]);
+        } else {
+          failureCount++;
+        }
+      } catch (err) {
+        failureCount++;
+        console.error("Deployment failed", err);
+      }
+    }
+
+    setLoading(false);
+
+    if (results.length > 0) {
+      setDeployResult(results[results.length - 1]); // Show the last one as main
+      setStep("SUCCESS");
+    } else {
+      setError("All deployments failed. Please check your funds.");
+      setStep("SESSION");
+      setIsMultiDeploy(false);
+    }
+  };
+
   const reset = () => {
     setStep("IDLE");
     setSession(null);
     setDeployResult(null);
+    setDeployResult(null);
+    setDeployHistory([]);
+    setIsMultiDeploy(false);
     setError(null);
   };
 
@@ -285,6 +389,37 @@ export default function Home() {
                     Resume Session
                   </Button>
                 </div>
+
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-[var(--border)]" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-[var(--card)] px-2 text-[var(--muted-foreground)]">Or Import Wallet</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportWallet}
+                    className="hidden"
+                    id="wallet-import"
+                  />
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                    variant="outline"
+                    className="w-full md:w-auto mx-auto min-w-[200px] gap-2"
+                  >
+                    <Upload size={16} /> Import Wallet JSON
+                  </Button>
+                  <p className="text-xs text-[var(--muted-foreground)] text-center">
+                    Upload a previously exported wallet file
+                  </p>
+                </div>
               </div>
             </Card>
           )}
@@ -300,12 +435,21 @@ export default function Home() {
                   <div className="flex-1">
                     <h2 className="text-xl font-semibold">Step 1: Fund Your Wallet</h2>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider font-semibold block mb-1">Session ID</span>
-                    <div className="flex items-center gap-1 bg-[var(--background)]/50 border border-[var(--border)] rounded px-2 py-1">
-                      <code className="text-xs font-mono">{session.sessionId.slice(0, 8)}...</code>
-                      <CopyButton text={session.sessionId} />
+                  <div className="text-right flex flex-col items-end gap-2">
+                    <div>
+                      <span className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider font-semibold block mb-1">Session ID</span>
+                      <div className="flex items-center gap-1 bg-[var(--background)]/50 border border-[var(--border)] rounded px-2 py-1">
+                        <code className="text-xs font-mono">{session.sessionId.slice(0, 8)}...</code>
+                        <CopyButton text={session.sessionId} />
+                      </div>
                     </div>
+                    <Button
+                      onClick={handleDownloadWallet}
+                      variant="outline"
+                      className="px-3 py-1.5 h-auto text-xs gap-1.5"
+                    >
+                      <Download size={12} /> Backup Wallet
+                    </Button>
                   </div>
                 </div>
 
@@ -356,6 +500,21 @@ export default function Home() {
                         )}
                       </Button>
                     </div>
+
+                    <div className="mt-4 flex gap-4 border-t border-[var(--border)] pt-4">
+                      <Button
+                        onClick={() => handleDeployMultiple(10)}
+                        disabled={loading || step === "DEPLOYING"}
+                        variant="secondary"
+                        className="w-full flex-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border-purple-500/20"
+                      >
+                        {step === "DEPLOYING" && isMultiDeploy ? (
+                          <><Loader2 className="animate-spin" /> {deployHistory.length}/10 Deployed</>
+                        ) : (
+                          <><Rocket size={16} /> Deploy 10x (Batch)</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -371,18 +530,42 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <h2 className="text-3xl font-bold text-white mb-2">Deployment Successful!</h2>
-                    <p className="text-[var(--muted-foreground)]">Your smart contract is live on the Devnet.</p>
+                    <h2 className="text-3xl font-bold text-white mb-2">
+                      {isMultiDeploy ? "Batch Deployment Complete!" : "Deployment Successful!"}
+                    </h2>
+                    <p className="text-[var(--muted-foreground)]">
+                      {isMultiDeploy
+                        ? `${deployHistory.length} smart contracts are live on the Devnet.`
+                        : "Your smart contract is live on the Devnet."}
+                    </p>
                   </div>
 
-                  <div className="bg-[var(--background)]/50 border border-[var(--border)] rounded-xl p-4 text-left space-y-4">
-                    <div>
-                      <label className="text-xs text-[var(--muted-foreground)] uppercase font-semibold">Contract Address</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="font-mono text-[var(--accent)] text-lg">{deployResult.contractAddress}</span>
-                        <CopyButton text={deployResult.contractAddress} />
+                  <div className="bg-[var(--background)]/50 border border-[var(--border)] rounded-xl p-4 text-left space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {isMultiDeploy ? (
+                      <div className="space-y-3">
+                        <label className="text-xs text-[var(--muted-foreground)] uppercase font-semibold sticky top-0 bg-[var(--background)]/95 backdrop-blur py-1 z-10 block">
+                          Deployed Contracts ({deployHistory.length})
+                        </label>
+                        {deployHistory.map((deploy, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm border-b border-[var(--border)]/50 last:border-0 pb-2 last:pb-0">
+                            <span className="text-[var(--muted-foreground)] w-6">{idx + 1}.</span>
+                            <span className="font-mono text-[var(--accent)] flex-1 truncate">{deploy.contractAddress}</span>
+                            <CopyButton text={deploy.contractAddress} />
+                            <a href={deploy.contractLink} target="_blank" rel="noreferrer" className="text-[var(--primary)] hover:text-[var(--primary)]/80">
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                        ))}
                       </div>
-                    </div>
+                    ) : (
+                      <div>
+                        <label className="text-xs text-[var(--muted-foreground)] uppercase font-semibold">Contract Address</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="font-mono text-[var(--accent)] text-lg">{deployResult.contractAddress}</span>
+                          <CopyButton text={deployResult.contractAddress} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-4 pt-4">
